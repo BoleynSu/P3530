@@ -136,8 +136,8 @@ where `T` must be an implicit-lifetime type.
 
 `read_maybe_uninitialized(v)` returns the value of `v` if `v` is initialized.
 
-Otherwise, it starts the lifetime of an object of type `T` in the storage
-referred-to by `v` with an unspecified value, and returns a copy.
+Otherwise, it returns an unspecified value.
+(This is how LLVM's `freeze` works.)
 
 ## Alternative 2
 
@@ -154,6 +154,14 @@ storage is considered initialized even if no write occured to the storage
 previously.
 
 The rest as `start_lifetime_as_array`.
+
+A companion function
+```cpp
+template <typename T>
+T* start_lifetime_as_uninitialized(void*);
+```
+
+is also provided, with the same semantics.
 
 # Wording
 

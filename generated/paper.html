@@ -546,10 +546,8 @@ implicit-lifetime type.</p>
 <p><code class="sourceCode cpp">read_maybe_uninitialized<span class="op">(</span>v<span class="op">)</span></code>
 returns the value of <code class="sourceCode cpp">v</code> if
 <code class="sourceCode cpp">v</code> is initialized.</p>
-<p>Otherwise, it starts the lifetime of an object of type
-<code class="sourceCode cpp">T</code> in the storage referred-to by
-<code class="sourceCode cpp">v</code> with an unspecified value, and
-returns a copy.</p>
+<p>Otherwise, it returns an unspecified value. (This is how LLVM’s
+<code class="sourceCode cpp">freeze</code> works.)</p>
 <h2 data-number="5.2" id="alternative-2"><span class="header-section-number">5.2</span> Alternative 2<a href="#alternative-2" class="self-link"></a></h2>
 <p>This approach is modeled after
 <code class="sourceCode cpp">start_lifetime_as_array</code>, but also
@@ -563,6 +561,10 @@ value.</p>
 initialized even if no write occured to the storage previously.</p>
 <p>The rest as
 <code class="sourceCode cpp">start_lifetime_as_array</code>.</p>
+<p>A companion function</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span> <span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">&gt;</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>T<span class="op">*</span> start_lifetime_as_uninitialized<span class="op">(</span><span class="dt">void</span><span class="op">*)</span>;</span></code></pre></div>
+<p>is also provided, with the same semantics.</p>
 <h1 data-number="6" id="wording"><span class="header-section-number">6</span> Wording<a href="#wording" class="self-link"></a></h1>
 <p>Will be provided when the alternative is chosen.</p>
 <h1 data-number="7" id="bibliography"><span class="header-section-number">7</span> References<a href="#bibliography" class="self-link"></a></h1>
