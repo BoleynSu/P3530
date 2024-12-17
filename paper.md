@@ -52,8 +52,8 @@ We therefore propose to add a new intrinsic to allow reading uninitialized memor
 
 # Motivation
 
-The adoption of erroneous behavior [@P2795R5], the behaviour when reading
-uninitialized memory has been defined to a greater extent than in C++23.
+The adoption of erroneous behavior [@P2795R5], defined the behaviour of reading
+uninitialized memory to a greater extent than in C++23.
 
 While this is a good thing in the vast majority of cases, it breaks rare
 legitimate usecases for algorithms that rely on reading uninitialized memory
