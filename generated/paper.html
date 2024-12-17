@@ -457,7 +457,13 @@ uninitialized memory</h1>
 <li><a href="#motivation" id="toc-motivation"><span class="toc-section-number">2</span> Motivation<span></span></a></li>
 <li><a href="#background" id="toc-background"><span class="toc-section-number">3</span> Background<span></span></a></li>
 <li><a href="#analysis" id="toc-analysis"><span class="toc-section-number">4</span> Analysis<span></span></a></li>
-<li><a href="#proposal" id="toc-proposal"><span class="toc-section-number">5</span> Proposal<span></span></a></li>
+<li><a href="#proposal" id="toc-proposal"><span class="toc-section-number">5</span> Proposal<span></span></a>
+<ul>
+<li><a href="#alternative-1" id="toc-alternative-1"><span class="toc-section-number">5.1</span> Alternative
+1<span></span></a></li>
+<li><a href="#alternative-2" id="toc-alternative-2"><span class="toc-section-number">5.2</span> Alternative
+2<span></span></a></li>
+</ul></li>
 <li><a href="#wording" id="toc-wording"><span class="toc-section-number">6</span> Wording<span></span></a></li>
 <li><a href="#bibliography" id="toc-bibliography"><span class="toc-section-number">7</span> References<span></span></a></li>
 </ul>
@@ -466,85 +472,100 @@ uninitialized memory</h1>
 <p>With current standard, it is impossible to safely read uninitialized
 memory. Thus, data structures or algorithms relying on reading
 uninitialized memory cannot be implemented in standard C++.</p>
-<p>We therefore propose adding a new intrinsic to allow reading
+<p>We therefore propose to add a new intrinsic to allow reading
 uninitialized memory.</p>
 <h1 data-number="2" id="motivation"><span class="header-section-number">2</span> Motivation<a href="#motivation" class="self-link"></a></h1>
-<p>With the adoption of erroneous behavior<span class="citation" data-cites="P2795R5">[<a href="https://wg21.link/p2795r5" role="doc-biblioref">P2795R5</a>]</span>, reading uninitialized memory
-has a more defined behavior than current C++23 behavior. It makes the
-code relying on a specific C++ compiler’s implementation for handling
-the undefined behavior caused by reading uninitialized memory no longer
-reliable. However, there are indeed (though rare) use cases where
-reading uninitialized memory can be useful. Therefore, instead of making
-it always an error, e.g. undefined behavior or erroneous behavior, we
-should propose a way to have defined behavior for reading uninitialized
-memory.</p>
+<p>The adoption of erroneous behavior <span class="citation" data-cites="P2795R5">[<a href="https://wg21.link/p2795r5" role="doc-biblioref">P2795R5</a>]</span>, the behaviour when reading
+uninitialized memory has been defined to a greater extent than in
+C++23.</p>
+<p>While this is a good thing in the vast majority of cases, it breaks
+rare legitimate usecases for algorithms that rely on reading
+uninitialized memory for their performance guarantees (cited below),
+with no recourse.</p>
+<p>We need an intrinsic to mark reading uninitialized memory as
+intended, not erroneous.</p>
 <h1 data-number="3" id="background"><span class="header-section-number">3</span> Background<a href="#background" class="self-link"></a></h1>
 <p>There is a well-known data structure to present sparse sets <span class="citation" data-cites="SS">[<a href="https://dl.acm.org/doi/pdf/10.1145/176454.176484" role="doc-biblioref">Sparse</a>]</span> as shown below.</p>
 <div class="sourceCode" id="cb1"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span> <span class="op">&lt;</span><span class="dt">int</span> n<span class="op">&gt;</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="kw">class</span> SparseSet <span class="op">{</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="co">// The invariants are index_of[elements[i]] == i for all 0&lt;=i&lt;size</span></span>
-<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">// and elements[0..size-1] contains all elements in the set.</span></span>
-<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">// These invariants guarantee the correctness.</span></span>
-<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> elements<span class="op">[</span>n<span class="op">]</span>;</span>
-<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> index_of<span class="op">[</span>n<span class="op">]</span>;</span>
-<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> size;</span>
-<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
-<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  SparseSet<span class="op">()</span> <span class="op">:</span> size<span class="op">(</span><span class="dv">0</span><span class="op">)</span> <span class="op">{}</span>  <span class="co">// we do not initialize elements and index_of</span></span>
-<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> clear<span class="op">()</span> <span class="op">{</span> size <span class="op">=</span> <span class="dv">0</span>; <span class="op">}</span></span>
-<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> find<span class="op">(</span><span class="dt">int</span> x<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>    <span class="co">// assume x in [0, n)</span></span>
-<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> i <span class="op">=</span> index_of<span class="op">[</span>x<span class="op">]</span>;</span>
-<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    <span class="co">// There is a chance we read index_of[x] before writing to it</span></span>
-<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    <span class="co">// which is totally fine (if we assume reading uninitialized</span></span>
-<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    <span class="co">// variable not UB).</span></span>
-<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    <span class="co">// Because the invariants we maintain guaranteed that if and only if</span></span>
-<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>    <span class="co">// the below condition holds, x in in the set.</span></span>
-<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span> <span class="op">&lt;=</span> i <span class="op">&amp;&amp;</span> i <span class="op">&lt;</span> size <span class="op">&amp;&amp;</span> elements<span class="op">[</span>i<span class="op">]</span> <span class="op">==</span> x;</span>
-<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
-<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> insert<span class="op">(</span><span class="dt">int</span> x<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>    <span class="co">// assume x in [0, n)</span></span>
-<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>find<span class="op">(</span>x<span class="op">))</span> <span class="op">{</span></span>
-<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>      <span class="cf">return</span>;</span>
-<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
-<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>    <span class="co">// The invariants are maintained.</span></span>
-<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    index_of<span class="op">[</span>x<span class="op">]</span> <span class="op">=</span> size;</span>
-<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>    elements<span class="op">[</span>size<span class="op">]</span> <span class="op">=</span> x;</span>
-<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>    size<span class="op">++</span>;</span>
-<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
-<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> remove<span class="op">(</span><span class="dt">int</span> x<span class="op">)</span> <span class="op">{</span></span>
-<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>    <span class="co">// assume x in [0, n)</span></span>
-<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(!</span>find<span class="op">(</span>x<span class="op">))</span> <span class="op">{</span></span>
-<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>      <span class="cf">return</span>;</span>
-<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>    <span class="op">}</span></span>
-<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>    <span class="co">// The invariants are maintained.</span></span>
-<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a>    size<span class="op">--</span>;</span>
-<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> i <span class="op">=</span> index_of<span class="op">[</span>x<span class="op">]</span>;</span>
-<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a>    elements<span class="op">[</span>i<span class="op">]</span> <span class="op">=</span> elements<span class="op">[</span>size<span class="op">]</span>;</span>
-<span id="cb1-41"><a href="#cb1-41" aria-hidden="true" tabindex="-1"></a>    index_of<span class="op">[</span>elements<span class="op">[</span>size<span class="op">]]</span> <span class="op">=</span> i;</span>
-<span id="cb1-42"><a href="#cb1-42" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
-<span id="cb1-43"><a href="#cb1-43" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
-<p>However, in the above implementation, we may read uninitialized
-memory in the <code class="sourceCode cpp">find</code> member function,
-which is undefined behavior or erroneous behavior according to current
-standard.</p>
-<p>To author’s knowledge, it is impossible to implement a data structure
-supporting the same set of operations with a worse time complexity of
-O(1) for each operation without relying on reading uninitialized
-memory.</p>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="co">// Invariants: </span></span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  <span class="co">// - index_of[elements[i]] == i for all 0&lt;=i&lt;size</span></span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">// - elements[0..size-1] contains all elements in the set.</span></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a>  <span class="co">// These invariants guarantee the correctness.</span></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> elements<span class="op">[</span>n<span class="op">]</span>;</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> index_of<span class="op">[</span>n<span class="op">]</span>;</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  <span class="dt">int</span> size;</span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  SparseSet<span class="op">()</span> <span class="op">:</span> size<span class="op">(</span><span class="dv">0</span><span class="op">)</span> <span class="op">{}</span>  <span class="co">// we do not initialize elements and index_of</span></span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> clear<span class="op">()</span> <span class="op">{</span> size <span class="op">=</span> <span class="dv">0</span>; <span class="op">}</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> find<span class="op">(</span><span class="dt">int</span> x<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    <span class="co">// assume x in [0, n)</span></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    <span class="co">// There is a chance we read index_of[x] before writing to it.</span></span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> i <span class="op">=</span> index_of<span class="op">[</span>x<span class="op">]</span>;</span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a>    <span class="co">// The algorithm is correct for an arbitrary value of index_of[x],</span></span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a>    <span class="co">// as long as the read itself is not undefined behavior,</span></span>
+<span id="cb1-19"><a href="#cb1-19" aria-hidden="true" tabindex="-1"></a>    <span class="co">// because the invariants guarantee x is in the set if and only if</span></span>
+<span id="cb1-20"><a href="#cb1-20" aria-hidden="true" tabindex="-1"></a>    <span class="co">// the below condition holds.</span></span>
+<span id="cb1-21"><a href="#cb1-21" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> <span class="dv">0</span> <span class="op">&lt;=</span> i <span class="op">&amp;&amp;</span> i <span class="op">&lt;</span> size <span class="op">&amp;&amp;</span> elements<span class="op">[</span>i<span class="op">]</span> <span class="op">==</span> x;</span>
+<span id="cb1-22"><a href="#cb1-22" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb1-23"><a href="#cb1-23" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> insert<span class="op">(</span><span class="dt">int</span> x<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb1-24"><a href="#cb1-24" aria-hidden="true" tabindex="-1"></a>    <span class="co">// assume x in [0, n)</span></span>
+<span id="cb1-25"><a href="#cb1-25" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(</span>find<span class="op">(</span>x<span class="op">))</span> <span class="op">{</span> <span class="cf">return</span>; <span class="op">}</span></span>
+<span id="cb1-26"><a href="#cb1-26" aria-hidden="true" tabindex="-1"></a>    <span class="co">// The invariants are maintained.</span></span>
+<span id="cb1-27"><a href="#cb1-27" aria-hidden="true" tabindex="-1"></a>    index_of<span class="op">[</span>x<span class="op">]</span> <span class="op">=</span> size;</span>
+<span id="cb1-28"><a href="#cb1-28" aria-hidden="true" tabindex="-1"></a>    elements<span class="op">[</span>size<span class="op">]</span> <span class="op">=</span> x;</span>
+<span id="cb1-29"><a href="#cb1-29" aria-hidden="true" tabindex="-1"></a>    size<span class="op">++</span>;</span>
+<span id="cb1-30"><a href="#cb1-30" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb1-31"><a href="#cb1-31" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> remove<span class="op">(</span><span class="dt">int</span> x<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb1-32"><a href="#cb1-32" aria-hidden="true" tabindex="-1"></a>    <span class="co">// assume x in [0, n)</span></span>
+<span id="cb1-33"><a href="#cb1-33" aria-hidden="true" tabindex="-1"></a>    <span class="cf">if</span> <span class="op">(!</span>find<span class="op">(</span>x<span class="op">))</span> <span class="op">{</span> <span class="cf">return</span>; <span class="op">}</span></span>
+<span id="cb1-34"><a href="#cb1-34" aria-hidden="true" tabindex="-1"></a>    <span class="co">// The invariants are maintained.</span></span>
+<span id="cb1-35"><a href="#cb1-35" aria-hidden="true" tabindex="-1"></a>    size<span class="op">--</span>;</span>
+<span id="cb1-36"><a href="#cb1-36" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> i <span class="op">=</span> index_of<span class="op">[</span>x<span class="op">]</span>;</span>
+<span id="cb1-37"><a href="#cb1-37" aria-hidden="true" tabindex="-1"></a>    elements<span class="op">[</span>i<span class="op">]</span> <span class="op">=</span> elements<span class="op">[</span>size<span class="op">]</span>;</span>
+<span id="cb1-38"><a href="#cb1-38" aria-hidden="true" tabindex="-1"></a>    index_of<span class="op">[</span>elements<span class="op">[</span>size<span class="op">]]</span> <span class="op">=</span> i;</span>
+<span id="cb1-39"><a href="#cb1-39" aria-hidden="true" tabindex="-1"></a>  <span class="op">}</span></span>
+<span id="cb1-40"><a href="#cb1-40" aria-hidden="true" tabindex="-1"></a><span class="op">}</span>;</span></code></pre></div>
+<p>The read <code class="sourceCode cpp">index_of<span class="op">[</span>x<span class="op">]</span></code>
+in <code class="sourceCode cpp">find</code> above may read uninitialized
+memory, which C++26 makes erroneous, without recourse.</p>
+<p>It is impossible to implement a data structure supporting the same
+set of operations with a worst-case time complexity of O(1) for each
+operation without relying on reading uninitialized memory, to the
+author’s best knowledge.</p>
 <h1 data-number="4" id="analysis"><span class="header-section-number">4</span> Analysis<a href="#analysis" class="self-link"></a></h1>
 <p>The LLVM project already supports
 <code class="sourceCode cpp">freeze</code> instruction which is the
 lower level equivalent of our proposal <span class="citation" data-cites="FRZ">[<a href="https://sf.snu.ac.kr/publications/undefllvm.pdf" role="doc-biblioref">Freeze</a>]</span>.</p>
 <h1 data-number="5" id="proposal"><span class="header-section-number">5</span> Proposal<a href="#proposal" class="self-link"></a></h1>
-<p>We propose to add <code class="sourceCode cpp">std<span class="op">::</span>read_maybe_uninitialized<span class="op">(</span><span class="kw">const</span> T<span class="op">&amp;</span> v<span class="op">)</span></code>.
-<code class="sourceCode cpp">read_maybe_uninitialized<span class="op">(</span>v<span class="op">)</span></code>
-will return the value of <code class="sourceCode cpp">v</code> if
-<code class="sourceCode cpp">v</code> is already written. Otherwise, it
-returns an arbitrary value. Before <code class="sourceCode cpp">v</code>
-is written, each invoke of <code class="sourceCode cpp">read_maybe_uninitialized<span class="op">(</span>v<span class="op">)</span></code>
-can return different values.</p>
+<h2 data-number="5.1" id="alternative-1"><span class="header-section-number">5.1</span> Alternative 1<a href="#alternative-1" class="self-link"></a></h2>
+<p>We propose to add a magic function</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span> <span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">&gt;</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>T std<span class="op">::</span>read_maybe_uninitialized<span class="op">(</span><span class="kw">const</span> T<span class="op">&amp;</span> v<span class="op">)</span> <span class="kw">noexcept</span>;</span></code></pre></div>
+<p>where <code class="sourceCode cpp">T</code> must be an
+implicit-lifetime type.</p>
+<p><code class="sourceCode cpp">read_maybe_uninitialized<span class="op">(</span>v<span class="op">)</span></code>
+returns the value of <code class="sourceCode cpp">v</code> if
+<code class="sourceCode cpp">v</code> is initialized.</p>
+<p>Otherwise, it starts the lifetime of an object of type
+<code class="sourceCode cpp">T</code> in the storage referred-to by
+<code class="sourceCode cpp">v</code> with an unspecified value, and
+returns a copy.</p>
+<h2 data-number="5.2" id="alternative-2"><span class="header-section-number">5.2</span> Alternative 2<a href="#alternative-2" class="self-link"></a></h2>
+<p>This approach is modeled after
+<code class="sourceCode cpp">start_lifetime_as_array</code>, but also
+marks the storage as having been initialized to an unspecified but valid
+value.</p>
+<div class="sourceCode" id="cb3"><pre class="sourceCode cpp"><code class="sourceCode cpp"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="kw">template</span> <span class="op">&lt;</span><span class="kw">typename</span> T<span class="op">&gt;</span></span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>T<span class="op">*</span> start_lifetime_as_array_uninitialized<span class="op">(</span><span class="dt">void</span><span class="op">*</span> v, <span class="dt">size_t</span> n<span class="op">)</span> <span class="kw">noexcept</span>;</span></code></pre></div>
+<p>Implicitly creates an array with element type
+<code class="sourceCode cpp">T</code> and length
+<code class="sourceCode cpp">n</code>, and the storage is considered
+initialized even if no write occured to the storage previously.</p>
+<p>The rest as
+<code class="sourceCode cpp">start_lifetime_as_array</code>.</p>
 <h1 data-number="6" id="wording"><span class="header-section-number">6</span> Wording<a href="#wording" class="self-link"></a></h1>
-<p>TODO</p>
+<p>Will be provided when the alternative is chosen.</p>
 <h1 data-number="7" id="bibliography"><span class="header-section-number">7</span> References<a href="#bibliography" class="self-link"></a></h1>
 <div id="refs" class="references csl-bib-body hanging-indent" data-entry-spacing="1" role="doc-bibliography">
 <div id="ref-FRZ" class="csl-entry" role="doc-biblioentry">

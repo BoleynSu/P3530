@@ -44,20 +44,23 @@ references:
 
 # Abstract
 
-With current standard, it is impossible to safely read uninitialized memory. Thus,
-data structures or algorithms relying on reading uninitialized memory cannot be
-implemented in standard C++.
+With current standard, it is impossible to safely read uninitialized memory.
+Thus, data structures or algorithms relying on reading uninitialized memory
+cannot be implemented in standard C++.
 
 We therefore propose to add a new intrinsic to allow reading uninitialized memory.
 
 # Motivation
 
-With the adoption of erroneous behavior[@P2795R5], reading uninitialized memory has a more defined behavior
-than current C++23 behavior. It makes the code relying on a specific C++ compiler's implementation
-for handling the undefined behavior caused by reading uninitialized memory no longer possible. However, there are
-indeed (though rare) use cases where reading uninitialized memory can be useful. Therefore, instead
-of making it always an error, e.g. undefined behavior or erroneous behavior, we should propose
-a way to have defined behavior for reading uninitialized memory.
+The adoption of erroneous behavior [@P2795R5], the behaviour when reading
+uninitialized memory has been defined to a greater extent than in C++23.
+
+While this is a good thing in the vast majority of cases, it breaks rare
+legitimate usecases for algorithms that rely on reading uninitialized memory
+for their performance guarantees (cited below), with no recourse.
+
+We need an intrinsic to mark reading uninitialized memory as intended, not
+erroneous.
 
 # Background
 
@@ -66,8 +69,9 @@ There is a well-known data structure to present sparse sets [@SS] as shown below
 ```c++
 template <int n>
 class SparseSet {
-  // The invariants are index_of[elements[i]] == i for all 0<=i<size
-  // and elements[0..size-1] contains all elements in the set.
+  // Invariants: 
+  // - index_of[elements[i]] == i for all 0<=i<size
+  // - elements[0..size-1] contains all elements in the set.
   // These invariants guarantee the correctness.
   int elements[n];
   int index_of[n];
@@ -77,19 +81,17 @@ public:
   void clear() { size = 0; }
   bool find(int x) {
     // assume x in [0, n)
+    // There is a chance we read index_of[x] before writing to it.
     int i = index_of[x];
-    // There is a chance we read index_of[x] before writing to it
-    // which is totally fine (if we assume reading uninitialized
-    // variable not UB).
-    // Because the invariants we maintain guaranteed that if and only if
-    // the below condition holds, x in in the set.
+    // The algorithm is correct for an arbitrary value of index_of[x],
+    // as long as the read itself is not undefined behavior,
+    // because the invariants guarantee x is in the set if and only if
+    // the below condition holds.
     return 0 <= i && i < size && elements[i] == x;
   }
   void insert(int x) {
     // assume x in [0, n)
-    if (find(x)) {
-      return;
-    }
+    if (find(x)) { return; }
     // The invariants are maintained.
     index_of[x] = size;
     elements[size] = x;
@@ -97,9 +99,7 @@ public:
   }
   void remove(int x) {
     // assume x in [0, n)
-    if (!find(x)) {
-      return;
-    }
+    if (!find(x)) { return; }
     // The invariants are maintained.
     size--;
     int i = index_of[x];
@@ -109,24 +109,53 @@ public:
 };
 ```
 
-However, in the above implementation, we may read uninitialized memory in the `find` member function,
-which is undefined behavior or erroneous behavior according to the current standard.
+The read `index_of[x]` in `find` above may read uninitialized memory,
+which C++26 makes erroneous, without recourse.
 
-To author's knowledge, it is impossible to implement a data structure supporting the same set of operations
-with a worse time complexity of O(1) for each operation without relying on reading uninitialized memory.
+It is impossible to implement a data structure supporting the same set of operations
+with a worst-case time complexity of O(1) for each operation without relying on
+reading uninitialized memory, to the author's best knowledge.
 
 # Analysis
 
-The LLVM project already supports `freeze` instruction which is the lower level equivalent of our proposal [@FRZ].
+The LLVM project already supports `freeze` instruction which is the lower level
+equivalent of our proposal [@FRZ].
 
 # Proposal
 
-We propose to add `std::read_maybe_uninitialized(const T& v)`. `read_maybe_uninitialized(v)`
-will return the value of `v` if `v` is already written. Otherwise, it returns an arbitrary
-value. Before `v` is written, each invoke of `read_maybe_uninitialized(v)` can return different
-values.
+## Alternative 1
+
+We propose to add a magic function
+
+```cpp
+template <typename T>
+T std::read_maybe_uninitialized(const T& v) noexcept;
+```
+
+where `T` must be an implicit-lifetime type.
+
+`read_maybe_uninitialized(v)` returns the value of `v` if `v` is initialized.
+
+Otherwise, it starts the lifetime of an object of type `T` in the storage
+referred-to by `v` with an unspecified value, and returns a copy.
+
+## Alternative 2
+
+This approach is modeled after `start_lifetime_as_array`, but also marks
+the storage as having been initialized to an unspecified but valid value.
+
+```cpp
+template <typename T>
+T* start_lifetime_as_array_uninitialized(void* v, size_t n) noexcept;
+```
+
+Implicitly creates an array with element type `T` and length `n`, and the
+storage is considered initialized even if no write occured to the storage
+previously.
+
+The rest as `start_lifetime_as_array`.
 
 # Wording
 
-TODO
+Will be provided when the alternative is chosen.
 
