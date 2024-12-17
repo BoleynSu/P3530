@@ -1,8 +1,8 @@
 ---
 title: Intrinsic for reading uninitialized memory
-document: P3530
+document: P3530R0
 date: 2024-12-17
-audience: TODO
+audience: EWG, Core, LWG
 author:
   - name: Boleyn Su
     email: <boleyn.su@gmail.com>
