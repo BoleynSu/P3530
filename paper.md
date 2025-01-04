@@ -79,7 +79,7 @@ class SparseSet {
 public:
   SparseSet() : size(0) {}  // we do not initialize elements and index_of
   void clear() { size = 0; }
-  bool find(int x) {
+  bool find(int x) const {
     // assume x in [0, n)
     // There is a chance we read index_of[x] before writing to it.
     int i = index_of[x];

@@ -497,7 +497,7 @@ intended, not erroneous.</p>
 <span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a><span class="kw">public</span><span class="op">:</span></span>
 <span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  SparseSet<span class="op">()</span> <span class="op">:</span> size<span class="op">(</span><span class="dv">0</span><span class="op">)</span> <span class="op">{}</span>  <span class="co">// we do not initialize elements and index_of</span></span>
 <span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  <span class="dt">void</span> clear<span class="op">()</span> <span class="op">{</span> size <span class="op">=</span> <span class="dv">0</span>; <span class="op">}</span></span>
-<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> find<span class="op">(</span><span class="dt">int</span> x<span class="op">)</span> <span class="op">{</span></span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a>  <span class="dt">bool</span> find<span class="op">(</span><span class="dt">int</span> x<span class="op">)</span> <span class="kw">const</span> <span class="op">{</span></span>
 <span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a>    <span class="co">// assume x in [0, n)</span></span>
 <span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>    <span class="co">// There is a chance we read index_of[x] before writing to it.</span></span>
 <span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a>    <span class="dt">int</span> i <span class="op">=</span> index_of<span class="op">[</span>x<span class="op">]</span>;</span>
